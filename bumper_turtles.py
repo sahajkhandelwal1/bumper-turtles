@@ -1,26 +1,10 @@
-# ══════════════════════════════════════════════════════════════════════════════
-#  BUMPER TURTLES
-#  A bouncing ball game with personality-driven bumpers and falling weapons.
-#
-#  SECTIONS:
-#   0 — SHARED:          screen, terminal input, shared globals, shared turtles
-#   1 — MEMBER 1:        Bumper System  (draw, personalities, collision)
-#   2 — MEMBER 2:        Ball Physics   (movement, bouncing, trail, steering)
-#   3 — MEMBER 3:        Falling Weapons (spawning, movement, collision)
-#   4 — GAME LOOP:       HUD, main loop, key bindings, entry point
-# ══════════════════════════════════════════════════════════════════════════════
 
 import turtle
 import random
 import math
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 0 — SHARED
-#  Screen setup, terminal input, and variables used by every section.
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Terminal / command-line input (runs before turtle window appears) ─────────
 
 print("   BUMPER TURTLES")
 
@@ -30,7 +14,6 @@ difficulty     = difficulty_raw.lower() if difficulty_raw else "medium"
 print(f"\nWelcome, {player_name}!  Difficulty: {difficulty.upper()}")
 print("SPACE=launch  Arrows=steer  R=reset  B=add bumper  C=clear  Q=quit\n")
 
-# ── Screen ────────────────────────────────────────────────────────────────────
 screen = turtle.Screen()
 screen.setup(width=800, height=600)
 screen.bgcolor("black")
@@ -58,12 +41,6 @@ ball.speed(0)
 ball.goto(0, 0)
 
 
-
-#  BUMPER SYSTEM
-#
-#  EVENTS:    mouse click: place bumper 'b': add random 'c': clear all
-#  LISTS:     bumpers list with append, index, enumerate, clear, len
-#  STRINGS:   join, zfill, split, upper, slicing
 
 
 
@@ -208,13 +185,6 @@ screen.onclick(place_bumper_at_click)
 screen.onkeypress(add_random_bumper, "b")
 screen.onkeypress(clear_bumpers,     "c")
 
-
-
-#BALL PHYSICS
-
-#  EVENTS:    space=launch, arrows=steer, 'r'=reset
-#  LISTS:     ball_trail (append, slicing, enumerate, indexing, clear)
-#  STRINGS:   zfill, join, upper, split, slicing
 
 
 
