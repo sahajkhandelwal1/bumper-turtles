@@ -261,9 +261,11 @@ def launch_ball():
 
 
 def reset_ball():
-    """'r' key: return ball to center and clear all physics state."""
+    """'r' key: reset ball, board, weapons, and score for a fresh game."""
     global ball_dx, ball_dy, ball_speed_multiplier, ball_launched, game_state
+    global score, _frame_count
 
+    # Reset ball
     ball.goto(0, 0)
     ball.color("white")
     ball_dx               = 0.0
@@ -271,7 +273,19 @@ def reset_ball():
     ball_speed_multiplier = 1.0
     ball_launched         = False
     ball_trail.clear()
-    game_state            = "waiting"
+
+    # Reset bumpers to a fresh random layout
+    init_bumpers(count=10)
+
+    # Clear all falling weapons still on screen
+    for w_entry in active_weapons:
+        w_entry[0].hideturtle()
+    active_weapons.clear()
+
+    # Reset shared state
+    score         = 0
+    _frame_count  = 0
+    game_state    = "waiting"
 
 
 def steer_left():
