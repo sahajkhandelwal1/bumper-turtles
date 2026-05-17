@@ -21,9 +21,9 @@ import math
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Terminal / command-line input (runs before turtle window appears) ─────────
-print("=" * 40)
+
 print("   BUMPER TURTLES")
-print("=" * 40)
+
 player_name    = input("Enter your name: ").strip() or "Player"
 difficulty_raw = input("Difficulty (easy / medium / hard): ").strip()
 difficulty     = difficulty_raw.lower() if difficulty_raw else "medium"
@@ -35,15 +35,15 @@ screen = turtle.Screen()
 screen.setup(width=800, height=600)
 screen.bgcolor("black")
 screen.title("Bumper Turtles")
-screen.tracer(0)   # manual rendering via screen.update() each frame
+screen.tracer(0)
 
-# ── Shared game state ─────────────────────────────────────────────────────────
-game_state      = "waiting"   # "waiting" | "playing" | "game_over"
+
+game_state      = "waiting"
 score           = 0
 _frame_count    = 0
 COLOR_CONSTANTS = ["cyan", "magenta", "yellow", "lime", "orange", "white", "red"]
 
-# ── Shared turtles (declared here; behavior owned by each member's section) ───
+# Shared turtles (declared here but behavior owned by each member's section)
 hud = turtle.Turtle()
 hud.hideturtle()
 hud.penup()
@@ -58,15 +58,15 @@ ball.speed(0)
 ball.goto(0, 0)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 1 — MEMBER 1: BUMPER SYSTEM
+
+#  BUMPER SYSTEM
 #
-#  EVENTS:    mouse click → place bumper | 'b' → add random | 'c' → clear all
+#  EVENTS:    mouse click: place bumper 'b': add random 'c': clear all
 #  LISTS:     bumpers list with append, index, enumerate, clear, len
 #  STRINGS:   join, zfill, split, upper, slicing
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Member 1 variables ────────────────────────────────────────────────────────
+
+
 # Each bumper stored as: [x, y, personality, hit_count, pulse_frames]
 bumpers         = []
 bumper_colors   = ["cyan", "magenta", "yellow", "lime", "orange", "red", "white"]
@@ -87,11 +87,10 @@ def init_bumpers(count=10):
         x = random.randint(-350, 350)
         y = random.randint(-220, 220)
         personality = random.choice(PERSONALITY_TYPES)
-        bumpers.append([x, y, personality, 0, 0])   # hit_count=0, pulse_frames=0
+        bumpers.append([x, y, personality, 0, 0])
 
 
 def draw_bumper(x, y, personality, hit_count, pulse=False):
-    """Draw one bumper: color cycles by hit count; pulse briefly on hit."""
     color  = bumper_colors[hit_count % len(bumper_colors)]   # list indexing
     radius = BUMPER_RADIUS + 8 if pulse else BUMPER_RADIUS   # expand on hit
     bumper_pen.color(color)
@@ -105,37 +104,33 @@ def draw_bumper(x, y, personality, hit_count, pulse=False):
 
 
 def draw_all_bumpers():
-    """Redraw every bumper; tick down each bumper's pulse countdown."""
+    """Redraw every bumper and tick down each bumper's pulse countdown."""
     bumper_pen.clear()
     for b in bumpers:
-        pulsing = b[4] > 0            # list index read
+        pulsing = b[4] > 0            
         draw_bumper(b[0], b[1], b[2], b[3], pulse=pulsing)
         if b[4] > 0:
-            b[4] -= 1   # list index write: decrement pulse countdown
+            b[4] -= 1 
 
 
 def apply_bumper_effect(bumper):
-    """Score the hit, build string outputs, then apply the physics effect."""
+
     global ball_dx, ball_dy, score
 
     bumper[3] += 1   # list index write: increment hit_count
     bumper[4] = 8    # list index write: trigger 8-frame pulse
     score += 10
 
-    # ── String manipulation ───────────────────────────────────────────────
+    #String manipulation
     # join: build a formatted hit announcement from a list of parts
     hit_message = " | ".join([player_name, bumper[2], f"hit #{bumper[3]}"])
 
-    # zfill: zero-pad score to 6 digits for display
     raw_score_str = str(score).zfill(6)
 
-    # split: break difficulty string into a list of words
     diff_parts = difficulty.split()
 
-    # upper: capitalize the first difficulty word
     diff_word = diff_parts[0].upper()
 
-    # slicing: take only the first 3 characters
     diff_slice = diff_word[:3]
 
     # Combine into a compact difficulty/score label
@@ -143,7 +138,7 @@ def apply_bumper_effect(bumper):
 
     print(f"  {hit_message}  —  {difficulty_warning}")
 
-    # ── Physics effect by personality ────────────────────────────────────
+
     bx, by   = bumper[0], bumper[1]
     ball_x   = ball.xcor()
     ball_y   = ball.ycor()
@@ -162,7 +157,7 @@ def apply_bumper_effect(bumper):
         ball_dy += 0.2 * (toward_y / dist)
 
     elif bumper[2] == "spinner":
-        # Rotate velocity vector 45 degrees clockwise
+        # Rotate velocity 45 degrees clockwise
         angle    = math.radians(45)
         new_dx   = ball_dx * math.cos(angle) - ball_dy * math.sin(angle)
         new_dy   = ball_dx * math.sin(angle) + ball_dy * math.cos(angle)
@@ -170,29 +165,28 @@ def apply_bumper_effect(bumper):
 
     elif bumper[2] == "teleporter":
         # Jump ball to a random other bumper's position
-        others = [b for b in bumpers if b is not bumper]   # list comprehension
+        others = [b for b in bumpers if b is not bumper]
         if others:
             dest = random.choice(others)
             ball.goto(dest[0], dest[1])
 
 
 def check_bumper_collision():
-    """Detect ball–bumper overlap; apply the first match found this frame."""
+    """Detect ball–bumper overlap and apply the first match found this frame."""
     bx = ball.xcor()
     by = ball.ycor()
     for b in bumpers:
         dist = math.sqrt((bx - b[0]) ** 2 + (by - b[1]) ** 2)
-        if dist < BUMPER_RADIUS + 10:   # 10 ≈ ball visual radius
+        if dist < BUMPER_RADIUS + 10: 
             apply_bumper_effect(b)
-            break   # one collision per frame prevents compounding effects
+            break
 
 
-# ── Member 1 event handlers ───────────────────────────────────────────────────
 
 def place_bumper_at_click(x, y):
     """Mouse click: add a bumper at the clicked screen coordinate."""
     personality = random.choice(PERSONALITY_TYPES)
-    bumpers.append([x, y, personality, 0, 0])   # list append
+    bumpers.append([x, y, personality, 0, 0])
 
 
 def add_random_bumper():
@@ -200,12 +194,12 @@ def add_random_bumper():
     x = random.randint(-350, 350)
     y = random.randint(-220, 220)
     personality = random.choice(PERSONALITY_TYPES)
-    bumpers.append([x, y, personality, 0, 0])   # list append
+    bumpers.append([x, y, personality, 0, 0])   
 
 
 def clear_bumpers():
     """'c' key: remove every bumper from the game."""
-    bumpers.clear()          # list clear
+    bumpers.clear() 
     bumper_pen.clear()
 
 
@@ -215,22 +209,22 @@ screen.onkeypress(add_random_bumper, "b")
 screen.onkeypress(clear_bumpers,     "c")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 2 — MEMBER 2: BALL PHYSICS
-#
-#  EVENTS:    space=launch | arrows=steer | 'r'=reset
+
+#BALL PHYSICS
+
+#  EVENTS:    space=launch, arrows=steer, 'r'=reset
 #  LISTS:     ball_trail (append, slicing, enumerate, indexing, clear)
 #  STRINGS:   zfill, join, upper, split, slicing
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Member 2 variables ────────────────────────────────────────────────────────
-ball_dx               = 0.0    # horizontal velocity (pixels per frame)
-ball_dy               = 0.0    # vertical velocity (pixels per frame)
+
+
+ball_dx               = 0.0    # horizontal velocity 
+ball_dy               = 0.0    # vertical velocity
 ball_speed_multiplier = 1.0    # grows on each wall bounce
 ball_launched         = False
-ball_trail            = []     # list of (x, y) tuples — last 10 positions
-_speed_display_str    = "SPD: 00.00"   # read by update_hud each frame
-_warning_label        = ""             # shown when ball is moving fast
+ball_trail            = []
+_speed_display_str    = "SPD: 00.00"   
+_warning_label        = ""           
 
 trail_pen = turtle.Turtle()
 trail_pen.hideturtle()
@@ -241,7 +235,7 @@ trail_pen.speed(0)
 WALL_LEFT, WALL_RIGHT = -390,  390
 WALL_TOP, WALL_BOTTOM =  280, -280
 
-# Trail shades from darkest (oldest position) to lightest (newest)
+# Trail shades from darkest to lightest
 TRAIL_SHADES = [
     "#1a1a1a", "#2e2e2e", "#424242", "#575757", "#6b6b6b",
     "#808080", "#949494", "#a8a8a8", "#bdbdbd", "#d1d1d1"
@@ -257,7 +251,6 @@ def launch_ball():
     game_state    = "playing"
     ball_launched = True
 
-    # String slicing: first character of difficulty selects speed tier
     diff_key = difficulty[:1]   # 'e', 'm', or 'h'
     if diff_key == "e":
         ball_dx, ball_dy = 3.0, 3.0
@@ -277,7 +270,7 @@ def reset_ball():
     ball_dy               = 0.0
     ball_speed_multiplier = 1.0
     ball_launched         = False
-    ball_trail.clear()     # list clear
+    ball_trail.clear()
     game_state            = "waiting"
 
 
@@ -285,7 +278,7 @@ def steer_left():
     """Left arrow: nudge ball in the leftward direction."""
     global ball_dx
     if game_state == "playing":
-        ball_dx = max(ball_dx - 1.5, -10)   # list-style cap via max()
+        ball_dx = max(ball_dx - 1.5, -10)
 
 
 def steer_right():
@@ -310,7 +303,7 @@ def steer_down():
 
 
 def bounce_wall():
-    """Reverse velocity at each boundary wall; increase speed slightly."""
+    """Reverse velocity at each boundary wall and increase speed slightly."""
     global ball_dx, ball_dy, ball_speed_multiplier
 
     if ball.xcor() >= WALL_RIGHT or ball.xcor() <= WALL_LEFT:
@@ -323,16 +316,16 @@ def bounce_wall():
 
 
 def draw_trail():
-    """Render ghost dots from ball_trail; oldest dots are darker."""
+    """Render ghost dots from ball_trail (oldest dots are darker.)"""
     trail_pen.clear()
     trail_len = len(ball_trail)
     if trail_len < 2:
         return
-    for i, pos in enumerate(ball_trail):              # enumerate for index
+    for i, pos in enumerate(ball_trail):
         shade_idx = int(i / trail_len * len(TRAIL_SHADES))
         shade_idx = min(shade_idx, len(TRAIL_SHADES) - 1)
-        trail_pen.color(TRAIL_SHADES[shade_idx])      # list indexing
-        trail_pen.goto(pos[0], pos[1])                # tuple indexing
+        trail_pen.color(TRAIL_SHADES[shade_idx])      
+        trail_pen.goto(pos[0], pos[1])                
         trail_pen.dot(8)
 
 
@@ -349,11 +342,11 @@ def move_ball():
     )
 
     bounce_wall()
-    check_bumper_collision()   # calls Member 1's function
+    check_bumper_collision()
 
-    # Update ghost trail: append current position then slice to last 10 entries
-    ball_trail.append((ball.xcor(), ball.ycor()))   # list append
-    ball_trail = ball_trail[-10:]                    # list slicing
+
+    ball_trail.append((ball.xcor(), ball.ycor()))   
+    ball_trail = ball_trail[-10:]                    
 
     # Change ball color based on current speed
     speed = round(math.sqrt(ball_dx ** 2 + ball_dy ** 2) * ball_speed_multiplier, 1)
@@ -364,15 +357,13 @@ def move_ball():
     else:
         ball.color("red")
 
-    # ── String manipulation ───────────────────────────────────────────────
-    # join + upper: build a speed-alert label shown on HUD when ball is fast
+
     parts   = ["BALL", "SPEED", "ALERT"]
     warning = " >> ".join(parts).upper()    # join then upper
     _warning_label = warning if speed > 7 else ""
 
-    # split + upper + slicing + zfill: build the live speed/difficulty HUD line
-    diff_display       = difficulty.split()[0].upper()   # split → index → upper
-    diff_key           = difficulty[:1]                  # slicing
+    diff_display       = difficulty.split()[0].upper()
+    diff_key           = difficulty[:1]                  
     speed_tier         = "EASY" if diff_key == "e" else ("HARD" if diff_key == "h" else "MED")
     _speed_display_str = f"SPD: {str(speed).zfill(5)}  [{diff_display}/{speed_tier}]"
 
@@ -388,42 +379,34 @@ screen.onkeypress(steer_down,   "Down")
 screen.onkeypress(reset_ball,   "r")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 3 — MEMBER 3: FALLING WEAPONS
-#
-#  LISTS:   weapon_types (color/speed/size), active_weapons list
-#  EVENTS:  no direct key bindings — weapons spawn on a timer in game_loop
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Member 3 variables ────────────────────────────────────────────────────────
-# weapon_types: each entry = [color, speed, size_scale]
 weapon_types   = [["red", 3, 1.5], ["yellow", 5, 1.2], ["white", 2, 2.0]]
-active_weapons = []   # each entry: [turtle_obj, speed]
+active_weapons = []
 WEAPON_RADIUS  = 15
 
 
 def spawn_weapon():
     """Create a new falling weapon at a random x position at the top edge."""
-    idx   = random.randint(0, len(weapon_types) - 1)   # list indexing
+    idx   = random.randint(0, len(weapon_types) - 1)
     wtype = weapon_types[idx]
 
     w = turtle.Turtle()
     w.shape("circle")
-    w.color(wtype[0])       # list index [0] → color
-    w.shapesize(wtype[2])   # list index [2] → size scale
+    w.color(wtype[0])
+    w.shapesize(wtype[2])
     w.penup()
     w.speed(0)
     w.goto(random.randint(-370, 370), WALL_TOP + 20)
 
-    active_weapons.append([w, wtype[1]])   # list append; wtype[1] = speed
+    active_weapons.append([w, wtype[1]])
 
 
 def move_weapons():
     """Move every weapon downward; remove any that fall below the screen."""
     to_remove = []
     for w_entry in active_weapons:
-        w_turtle = w_entry[0]   # list index [0] → turtle
-        w_speed  = w_entry[1]   # list index [1] → speed
+        w_turtle = w_entry[0]
+        w_speed  = w_entry[1]
         w_turtle.sety(w_turtle.ycor() - w_speed)
         if w_turtle.ycor() < WALL_BOTTOM:
             w_turtle.hideturtle()
@@ -450,9 +433,6 @@ def check_weapon_collision():
         active_weapons.remove(entry)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 4 — GAME LOOP & ENTRY POINT
-# ══════════════════════════════════════════════════════════════════════════════
 
 def update_hud():
     """Redraw all on-screen text: score, speed, warnings, state messages."""
@@ -466,18 +446,15 @@ def update_hud():
         font=("Arial", 12, "bold")
     )
 
-    # Speed readout (updated by move_ball via _speed_display_str)
     hud.goto(-390, 240)
     hud.write(_speed_display_str, font=("Arial", 10, "normal"))
 
-    # Speed-alert label (set by move_ball when ball moves fast)
     if _warning_label:
         hud.goto(-390, 218)
         hud.color("red")
         hud.write(_warning_label, font=("Arial", 10, "bold"))
         hud.color("white")
 
-    # Bottom controls reminder
     hud.goto(-390, -288)
     hud.color("gray")
     hud.write(
@@ -486,7 +463,6 @@ def update_hud():
     )
     hud.color("white")
 
-    # Center state messages
     if game_state == "waiting":
         hud.goto(-155, 5)
         hud.write("Press SPACE to launch!", font=("Arial", 18, "bold"))
@@ -517,22 +493,20 @@ def game_loop():
     if game_state == "playing":
         move_ball()
         _frame_count += 1
-        if _frame_count % 180 == 0:   # spawn a weapon every ~3 seconds
+        if _frame_count % 180 == 0: 
             spawn_weapon()
         move_weapons()
         check_weapon_collision()
 
     draw_all_bumpers()
     update_hud()
-    screen.update()              # single manual render call per frame
+    screen.update()              
     screen.ontimer(game_loop, 16)
 
 
-# ── Register remaining key binding ────────────────────────────────────────────
 screen.listen()
 screen.onkeypress(quit_game, "q")
 
-# ── Start ─────────────────────────────────────────────────────────────────────
 init_bumpers(count=10)
 game_loop()
 screen.mainloop()
