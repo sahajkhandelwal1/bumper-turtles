@@ -11,6 +11,9 @@ print("   BUMPER TURTLES")
 player_name    = input("Enter your name: ").strip() or "Player"
 difficulty_raw = input("Difficulty (easy / medium / hard): ").strip()
 difficulty     = difficulty_raw.lower() if difficulty_raw else "medium"
+# Weapon spawn interval scales with difficulty (frames at ~60fps)
+_diff_key = difficulty[:1]
+WEAPON_SPAWN_INTERVAL = 90 if _diff_key == "h" else (240 if _diff_key == "e" else 150)
 print(f"\nWelcome, {player_name}!  Difficulty: {difficulty.upper()}")
 print("SPACE=launch  Arrows=steer  R=reset  B=add bumper  C=clear  Q=quit\n")
 
@@ -382,16 +385,38 @@ def spawn_weapon():
     w.speed(0)
     w.goto(random.randint(-370, 370), WALL_TOP + 20)
 
-    active_weapons.append([w, wtype[1]])
+    # Store as [turtle, dx, dy] — starts falling straight down
+    active_weapons.append([w, 0.0, -float(wtype[1])])
 
 
 def move_weapons():
-    """Move every weapon downward; remove any that fall below the screen."""
+    """Move weapons by dx/dy; bounce off walls and bumpers."""
     to_remove = []
     for w_entry in active_weapons:
         w_turtle = w_entry[0]
-        w_speed  = w_entry[1]
-        w_turtle.sety(w_turtle.ycor() - w_speed)
+        wx = w_turtle.xcor() + w_entry[1]
+        wy = w_turtle.ycor() + w_entry[2]
+
+        # Bounce off left/right walls
+        if wx > WALL_RIGHT or wx < WALL_LEFT:
+            w_entry[1] *= -1
+            wx = w_turtle.xcor()
+
+        # Reflect off any bumper the weapon overlaps
+        for b in bumpers:
+            dist = math.sqrt((wx - b[0]) ** 2 + (wy - b[1]) ** 2)
+            if dist < BUMPER_RADIUS + 12:
+                # Push velocity outward from bumper center
+                nx = wx - b[0]
+                ny = wy - b[1]
+                mag = math.sqrt(nx ** 2 + ny ** 2) or 1
+                spd = math.sqrt(w_entry[1] ** 2 + w_entry[2] ** 2)
+                w_entry[1] = (nx / mag) * spd
+                w_entry[2] = (ny / mag) * spd
+                wx, wy = w_turtle.xcor(), w_turtle.ycor()
+                break
+
+        w_turtle.goto(wx, wy)
         if w_turtle.ycor() < WALL_BOTTOM:
             w_turtle.hideturtle()
             to_remove.append(w_entry)
@@ -477,7 +502,7 @@ def game_loop():
     if game_state == "playing":
         move_ball()
         _frame_count += 1
-        if _frame_count % 180 == 0: 
+        if _frame_count % WEAPON_SPAWN_INTERVAL == 0:
             spawn_weapon()
         move_weapons()
         check_weapon_collision()
