@@ -2,8 +2,33 @@
 import turtle
 import random
 import math
+import json
+import os
 
 
+
+
+LEADERBOARD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leaderboard.json")
+
+
+def load_leaderboard():
+    if os.path.exists(LEADERBOARD_FILE):
+        try:
+            with open(LEADERBOARD_FILE, "r") as f:
+                data = json.load(f)
+            return sorted(data, key=lambda x: x[1], reverse=True)
+        except Exception:
+            return []
+    return []
+
+
+def save_to_leaderboard(name, final_score):
+    entries = load_leaderboard()
+    entries.append([name, final_score])
+    entries = sorted(entries, key=lambda x: x[1], reverse=True)[:10]
+    with open(LEADERBOARD_FILE, "w") as f:
+        json.dump(entries, f)
+    return entries
 
 
 print("   BUMPER TURTLES")
@@ -27,6 +52,8 @@ screen.tracer(0)
 game_state      = "waiting"
 score           = 0
 _frame_count    = 0
+_score_saved    = False
+leaderboard     = load_leaderboard()
 COLOR_CONSTANTS = ["cyan", "magenta", "yellow", "lime", "orange", "white", "red"]
 
 # Shared turtles (declared here but behavior owned by each member's section)
@@ -163,18 +190,31 @@ def check_bumper_collision():
 
 
 
+def _remove_one_existing_bumper():
+    """Remove a random bumper that is NOT the last element (just-added)."""
+    if len(bumpers) > 1:
+        idx = random.randint(0, len(bumpers) - 2)
+        bumpers.pop(idx)
+
+
 def place_bumper_at_click(x, y):
-    """Mouse click: add a bumper at the clicked screen coordinate."""
+    """Mouse click: add a bumper; swap out another only if 5+ already exist."""
     personality = random.choice(PERSONALITY_TYPES)
+    do_swap = len(bumpers) >= 5
     bumpers.append([x, y, personality, 0, 0])
+    if do_swap:
+        _remove_one_existing_bumper()
 
 
 def add_random_bumper():
-    """'b' key: add a bumper at a random position."""
+    """'b' key: add a bumper; swap out another only if 5+ already exist."""
     x = random.randint(-350, 350)
     y = random.randint(-220, 220)
     personality = random.choice(PERSONALITY_TYPES)
-    bumpers.append([x, y, personality, 0, 0])   
+    do_swap = len(bumpers) >= 5
+    bumpers.append([x, y, personality, 0, 0])
+    if do_swap:
+        _remove_one_existing_bumper()
 
 
 def clear_bumpers():
@@ -236,7 +276,7 @@ def launch_ball():
 def reset_ball():
     """'r' key: reset ball, board, weapons, and score for a fresh game."""
     global ball_dx, ball_dy, ball_speed_multiplier, ball_launched, game_state
-    global score, _frame_count
+    global score, _frame_count, _score_saved, leaderboard
 
     # Reset ball
     ball.goto(0, 0)
@@ -258,6 +298,8 @@ def reset_ball():
     # Reset shared state
     score         = 0
     _frame_count  = 0
+    _score_saved  = False
+    leaderboard   = load_leaderboard()
     game_state    = "waiting"
 
 
@@ -367,13 +409,13 @@ screen.onkeypress(reset_ball,   "r")
 
 
 
-weapon_types   = [["red", 3, 1.5], ["yellow", 5, 1.2], ["white", 2, 2.0]]
+weapon_types   = [["yellow", 3, 1.5], ["red", 5, 1.2], ["white", 2, 2.0]]
 active_weapons = []
 WEAPON_RADIUS  = 15
 
 
 def spawn_weapon():
-    """Create a new falling weapon at a random x position at the top edge."""
+    """Create a new homing missile at a random position along the top edge."""
     idx   = random.randint(0, len(weapon_types) - 1)
     wtype = weapon_types[idx]
 
@@ -383,17 +425,35 @@ def spawn_weapon():
     w.shapesize(wtype[2])
     w.penup()
     w.speed(0)
-    w.goto(random.randint(-370, 370), WALL_TOP + 20)
+    w.goto(random.randint(-370, 370), WALL_TOP - 20)
 
-    # Store as [turtle, dx, dy] — starts falling straight down
-    active_weapons.append([w, 0.0, -float(wtype[1])])
+    max_spd  = float(wtype[1])
+    lifetime = 700
+    # Store as [turtle, dx, dy, max_speed, lifetime]
+    active_weapons.append([w, 0.0, -max_spd, max_spd, lifetime])
 
 
 def move_weapons():
-    """Move weapons by dx/dy; bounce off walls and bumpers."""
+    """Move homing missiles: steer toward ball, bounce off all walls and bumpers."""
     to_remove = []
+    bx = ball.xcor()
+    by = ball.ycor()
     for w_entry in active_weapons:
         w_turtle = w_entry[0]
+        max_spd  = w_entry[3]
+
+        # Steer toward ball when it's in play
+        if ball_launched:
+            toward_x = bx - w_turtle.xcor()
+            toward_y = by - w_turtle.ycor()
+            dist = math.sqrt(toward_x ** 2 + toward_y ** 2) or 1
+            w_entry[1] += 0.35 * (toward_x / dist)
+            w_entry[2] += 0.35 * (toward_y / dist)
+            spd = math.sqrt(w_entry[1] ** 2 + w_entry[2] ** 2)
+            if spd > max_spd:
+                w_entry[1] = w_entry[1] / spd * max_spd
+                w_entry[2] = w_entry[2] / spd * max_spd
+
         wx = w_turtle.xcor() + w_entry[1]
         wy = w_turtle.ycor() + w_entry[2]
 
@@ -402,11 +462,15 @@ def move_weapons():
             w_entry[1] *= -1
             wx = w_turtle.xcor()
 
+        # Bounce off top/bottom walls (missiles stay in the arena)
+        if wy > WALL_TOP or wy < WALL_BOTTOM:
+            w_entry[2] *= -1
+            wy = w_turtle.ycor()
+
         # Reflect off any bumper the weapon overlaps
         for b in bumpers:
             dist = math.sqrt((wx - b[0]) ** 2 + (wy - b[1]) ** 2)
             if dist < BUMPER_RADIUS + 12:
-                # Push velocity outward from bumper center
                 nx = wx - b[0]
                 ny = wy - b[1]
                 mag = math.sqrt(nx ** 2 + ny ** 2) or 1
@@ -417,16 +481,20 @@ def move_weapons():
                 break
 
         w_turtle.goto(wx, wy)
-        if w_turtle.ycor() < WALL_BOTTOM:
+
+        # Expire after lifetime runs out
+        w_entry[4] -= 1
+        if w_entry[4] <= 0:
             w_turtle.hideturtle()
             to_remove.append(w_entry)
+
     for entry in to_remove:
         active_weapons.remove(entry)
 
 
 def check_weapon_collision():
     """End the game immediately if any weapon touches the ball."""
-    global game_state
+    global game_state, _score_saved, leaderboard
 
     bx = ball.xcor()
     by = ball.ycor()
@@ -438,8 +506,31 @@ def check_weapon_collision():
             game_state = "game_over"
             w_turtle.hideturtle()
             to_remove.append(w_entry)
+            if not _score_saved:
+                leaderboard = save_to_leaderboard(player_name, score)
+                _score_saved = True
     for entry in to_remove:
         active_weapons.remove(entry)
+
+
+def check_weapon_weapon_collisions():
+    """Destroy both enemies when two homing missiles touch each other."""
+    global score
+    to_remove = set()
+    for i in range(len(active_weapons)):
+        for j in range(i + 1, len(active_weapons)):
+            if i in to_remove or j in to_remove:
+                continue
+            wa = active_weapons[i][0]
+            wb = active_weapons[j][0]
+            dist = math.sqrt((wa.xcor() - wb.xcor()) ** 2 + (wa.ycor() - wb.ycor()) ** 2)
+            if dist < WEAPON_RADIUS * 2:
+                to_remove.add(i)
+                to_remove.add(j)
+                score += 25
+    for i in sorted(to_remove, reverse=True):
+        active_weapons[i][0].hideturtle()
+        active_weapons.pop(i)
 
 
 
@@ -447,7 +538,7 @@ def update_hud():
     """Redraw all on-screen text: score, speed, warnings, state messages."""
     hud.clear()
 
-    # Top bar: player name and zero-padded score
+    # Top-left: player name and zero-padded score
     hud.goto(-390, 262)
     hud.color("white")
     hud.write(
@@ -462,6 +553,27 @@ def update_hud():
         hud.goto(-390, 218)
         hud.color("red")
         hud.write(_warning_label, font=("Arial", 10, "bold"))
+        hud.color("white")
+
+    # Top-right: leaderboard
+    lb_x = 240
+    hud.goto(lb_x, 262)
+    hud.color("gold")
+    hud.write("HIGH SCORES", font=("Arial", 10, "bold"))
+    hud.color("white")
+    if leaderboard:
+        for i, entry in enumerate(leaderboard[:5]):
+            hud.goto(lb_x, 246 - i * 15)
+            name_col = "gold" if i == 0 else "white"
+            hud.color(name_col)
+            name_str  = entry[0][:9].ljust(9)
+            score_str = str(entry[1]).zfill(7)
+            hud.write(f"{i+1}. {name_str} {score_str}", font=("Arial", 9, "normal"))
+        hud.color("white")
+    else:
+        hud.goto(lb_x, 246)
+        hud.color("gray")
+        hud.write("No scores yet", font=("Arial", 9, "normal"))
         hud.color("white")
 
     hud.goto(-390, -288)
@@ -486,7 +598,12 @@ def update_hud():
             f"Final Score: {str(score).zfill(7)}",
             font=("Arial", 14, "normal")
         )
-        hud.goto(-175, -50)
+        if leaderboard and leaderboard[0][1] == score:
+            hud.goto(-115, -44)
+            hud.color("gold")
+            hud.write("NEW HIGH SCORE!", font=("Arial", 12, "bold"))
+            hud.color("white")
+        hud.goto(-175, -65)
         hud.write("Press R to play again", font=("Arial", 12, "normal"))
 
 
@@ -506,6 +623,7 @@ def game_loop():
             spawn_weapon()
         move_weapons()
         check_weapon_collision()
+        check_weapon_weapon_collisions()
 
     draw_all_bumpers()
     update_hud()
